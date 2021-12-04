@@ -15,7 +15,7 @@ class RecordPermissionActivity : Activity() {
     }
 
     lateinit var mediaProjectionManager: MediaProjectionManager
-    lateinit var recordMethod: String
+    private var nextActionIntent: Bundle? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,7 +30,7 @@ class RecordPermissionActivity : Activity() {
         val action = intent.action
         Log.d(TAG, "Received request $action")
 
-        recordMethod = intent.getStringExtra("record_method") ?: "media_recorder"
+        nextActionIntent = intent.extras
         startActivityForResult(mediaProjectionManager.createScreenCaptureIntent(), 1)
     }
 
@@ -45,7 +45,13 @@ class RecordPermissionActivity : Activity() {
             val metrics = DisplayMetrics()
             windowManager.defaultDisplay.getMetrics(metrics)
 
-            RecorderService.startLocalRecording(this, recordMethod, metrics, resultCode, data)
+            val nextAction = nextActionIntent?.getString("next_action")
+            if (nextAction == "start_streaming") {
+                RecorderService.startScreenStreaming(this, metrics, resultCode, data)
+            } else {
+                val recordMethod = nextActionIntent?.getString("record_method") ?: "media_recorder"
+                RecorderService.startLocalRecording(this, recordMethod, metrics, resultCode, data)
+            }
         }
     }
 }

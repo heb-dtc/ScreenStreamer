@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
             ScreenStreamerTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(color = MaterialTheme.colors.background) {
-                    RecordActionsView(this::onRecordClicked)
+                    RecordActionsView(this::onRecordClicked, this::onStreamClicked)
                 }
             }
         }
@@ -30,14 +30,28 @@ class MainActivity : ComponentActivity() {
 
     private fun onRecordClicked(recordMethod: String) {
         val intent = Intent(this, RecordPermissionActivity::class.java)
-        intent.putExtra("record_method", recordMethod)
+        val bundle = Bundle().apply {
+            putString("next_action", "start_recording")
+            putString("record_method", recordMethod)
+        }
+        intent.putExtras(bundle)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+    }
+
+    private fun onStreamClicked() {
+        val intent = Intent(this, RecordPermissionActivity::class.java)
+        val bundle = Bundle().apply {
+            putString("next_action", "start_streaming")
+        }
+        intent.putExtras(bundle)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
     }
 }
 
 @Composable
-fun RecordActionsView(onRecord: (method: String) -> Unit) {
+fun RecordActionsView(onRecord: (method: String) -> Unit, onStream: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxHeight()
@@ -47,7 +61,7 @@ fun RecordActionsView(onRecord: (method: String) -> Unit) {
         Button(onClick = {
             onRecord.invoke("media_recorder")
         }, modifier = Modifier.fillMaxWidth()) {
-            Text(text = "Start Local Recording (with MediaRecorder")
+            Text(text = "Start Local Recording (with MediaRecorder)")
         }
         Button(
             onClick = { onRecord.invoke("media_codec") },
@@ -55,7 +69,15 @@ fun RecordActionsView(onRecord: (method: String) -> Unit) {
                 .fillMaxWidth()
                 .padding(top = 12.dp)
         ) {
-            Text(text = "Start Local Recording (with MediaCodec")
+            Text(text = "Start Local Recording (with MediaCodec)")
+        }
+        Button(
+            onClick = { onStream.invoke() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+        ) {
+            Text(text = "Start Screen Streaming")
         }
     }
 }
@@ -64,6 +86,6 @@ fun RecordActionsView(onRecord: (method: String) -> Unit) {
 @Composable
 fun DefaultPreview() {
     ScreenStreamerTheme {
-        RecordActionsView({})
+        RecordActionsView({}, {})
     }
 }

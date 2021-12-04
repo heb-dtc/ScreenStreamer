@@ -25,6 +25,8 @@ class RecorderService : Service() {
     private var videoEncoder: MediaCodec? = null
     private var videoBufferInfo: MediaCodec.BufferInfo? = null
     private var muxer: MediaMuxer? = null
+    private var streamer: VideoStreamer? = null
+
     var trackIndex = -1
     var muxerStarted = false
 
@@ -33,6 +35,8 @@ class RecorderService : Service() {
     private var mediaProjectionManager: MediaProjectionManager? = null
     var virtualDisplay: VirtualDisplay? = null
     var mediaRecorder: MediaRecorder? = null
+
+    private var screenEncoder: MediaCodecScreenEncoder? = null
 
     val handler = Handler(Looper.getMainLooper())
     val drainEncoderRunnable = Runnable {
@@ -52,6 +56,29 @@ class RecorderService : Service() {
             //TODO: extract names to CONST
             intent.action = "START_LOCAL_RECORDING_SERVICE"
             intent.putExtra("record_method", method)
+            intent.putExtra("width", metrics.widthPixels)
+            intent.putExtra("height", metrics.heightPixels)
+            intent.putExtra("density", metrics.densityDpi)
+            intent.putExtra("code", resultCode)
+            intent.putExtra("data", data)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun startScreenStreaming(
+            context: Context,
+            metrics: DisplayMetrics,
+            resultCode: Int,
+            data: Intent
+        ) {
+
+            val intent = Intent(context, RecorderService::class.java)
+            //TODO: extract names to CONST
+            intent.action = "START_SCREEN_STREAMING_SERVICE"
             intent.putExtra("width", metrics.widthPixels)
             intent.putExtra("height", metrics.heightPixels)
             intent.putExtra("density", metrics.densityDpi)
@@ -149,49 +176,30 @@ class RecorderService : Service() {
                         )
                     }
                 }
-
-                //TODO change that, SELinux does not allow to use a LocalSocket :(
-                //val localSocket = LocalSocket()
-                //TODO: inject socket name
-                //localSocket.connect(LocalSocketAddress("gnirehtet"))
-
-                //val pipe = ParcelFileDescriptor.createPipe()
-                //val parcelRead = ParcelFileDescriptor(pipe[0])
-                //val parcelWrite = ParcelFileDescriptor(pipe[1])
-
-                /*
-                // clear mp4 headers before streaming?? might be useless for now?
-                try {
-                    val buffer = ByteArray(4)
-                    // Skip all atoms preceding mdat atom
-                    while (!Thread.interrupted()) {
-                        while (inputStream.read().toChar() != 'm')
-                        inputStream.read(buffer, 0, 3)
-                        if (buffer[0].toInt().toChar() == 'd' && buffer[1].toInt().toChar() == 'a' && buffer[2].toInt().toChar() == 't') break
-                    }
-                } catch (e: IOException) {
-                    Log.e(TAG, "Couldn't skip mp4 header :/")
-                    //TODO stop everything probably
-                    throw e
-                }
-
-                var offset = 0
-                val data = ByteArray(1024)
-
-                while (true) {
-                    val length = inputStream.read(data)
-                    localSocket.outputStream.write(data, offset, length)
-                    offset += length
-                }
-                */
-            } else if (intent.action == "START_STREAM_RECORDING_SERVICE") {
+            } else if (intent.action == "START_SCREEN_STREAMING_SERVICE") {
                 startForeground(1, createNotification())
+
+                val resultCode = intent.getIntExtra("code", -1)
+                val resultData = intent.getParcelableExtra("data") as Intent?
+                val screenWidth = intent.getIntExtra("width", 720)
+                val screenHeight = intent.getIntExtra("height", 1280)
+                val screenDensity = intent.getIntExtra("density", 1)
+
+                startStreamer(
+                    resultCode,
+                    resultData,
+                    screenWidth,
+                    screenHeight,
+                    screenDensity
+                )
             } else if (intent.action == "STOP_SCREEN_RECORD_SERVICE") {
                 mediaRecorder?.stop()
                 mediaRecorder?.release()
                 virtualDisplay?.release()
 
                 mediaProjection?.stop()
+
+                streamer?.stop()
 
                 handler.removeCallbacks(drainEncoderRunnable)
                 if (muxerStarted) {
@@ -245,6 +253,28 @@ class RecorderService : Service() {
         )
 
         mediaRecorder?.start()
+    }
+
+    private fun startStreamer(
+    resultCode: Int,
+    resultData: Intent?,
+    screenWidth: Int,
+    screenHeight: Int,
+    screenDensity: Int
+    ) {
+        mediaProjectionManager =
+                getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+
+        mediaProjection =
+                mediaProjectionManager?.getMediaProjection(resultCode, resultData!!)
+
+        mediaProjection?.let {
+            screenEncoder = MediaCodecScreenEncoder(screenWidth, screenHeight, screenDensity)
+            screenEncoder?.encode(it)
+
+            streamer = VideoStreamer("10.0.2.2", 54000, screenEncoder?.encoder!!)
+            streamer?.start()
+        }
     }
 
     private fun startMediaCodec(
