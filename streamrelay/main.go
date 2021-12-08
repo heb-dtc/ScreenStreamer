@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 )
@@ -100,21 +99,8 @@ func waitForStreamer(server net.Listener, framePipe chan<- frame) {
 
 func (s *streamer) stream() {
 	for {
-		fmt.Println("")
-		fmt.Println("Read incoming frame")
-		//ptsBuf := make([]byte, 8)
-		// TODO handle read error (if streamer is down, need to shutdown)
-		//io.ReadFull(s.conn, ptsBuf)
-		//var pts uint64
-		//buf := bytes.NewReader(ptsBuf)
-		//binary.Read(buf, binary.BigEndian, &pts)
-		//pts = binary.BigEndian.Uint64(ptsBuf)
-
-		//packetSizeBuf := make([]byte, 4)
-		//io.ReadFull(s.conn, packetSizeBuf)
-		//var packetSize uint32
-		//buf := bytes.NewReader(packetSizeBuf)
-		//binary.Read(buf, binary.BigEndian, &packetSize)
+		//log.Println("")
+		//log.Println("Read incoming frame")
 
 		// read first 12 bytes (pts/8bytes + packetSize/4bytes)
 		buf := make([]byte, 12)
@@ -128,8 +114,8 @@ func (s *streamer) stream() {
 		var size uint32
 		binary.Read(bytes.NewReader(sizeBuf), binary.BigEndian, &size)
 
-		log.Println("Frame metadata: pts is -> ", pts, " and packet size is ", size)
-		fmt.Println("")
+		//log.Println("Frame metadata: pts is -> ", pts, " and packet size is ", size)
+		//log.Println("")
 
 		packet := make([]byte, size)
 		io.ReadFull(s.conn, packet)

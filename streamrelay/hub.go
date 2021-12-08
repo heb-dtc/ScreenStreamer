@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 )
 
 type frame struct {
@@ -36,11 +34,10 @@ func (h *hub) broadcastFrame(frame frame) {
 	// TODO add timer to send frame at FPS speed?
 	// if 30FPS, send 1 frame every 33 milliseconds?
 	// only stream packet
-	reader := bytes.NewReader(frame.packet)
 
 	for _, player := range h.players {
 		fmt.Println("Write frame to player ", player.name)
-		io.CopyN(player.conn, reader, int64(frame.packetSize))
+		player.conn.Write(frame.packet)
 	}
 }
 
